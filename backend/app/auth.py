@@ -5,7 +5,7 @@ import jwt
 from fastapi import Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 
-from .config import SECRET_KEY, TOKEN_HOURS
+from .config import get_secret_key, TOKEN_HOURS
 from .db import get_db
 from . import models
 
@@ -19,21 +19,24 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def make_token(user_id: int, org_id: int | None = None) -> str:
+    secret = get_secret_key()
     payload = {
         "sub": str(user_id),
         "org": org_id,
         "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS),
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 
 def _decode(authorization: str | None):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing token")
+    secret = get_secret_key()
     try:
-        return jwt.decode(authorization[7:], SECRET_KEY, algorithms=["HS256"])
+        return jwt.decode(authorization[7:], secret, algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(401, "Invalid token")
+
 
 
 def current_user(authorization: str | None = Header(None), db: Session = Depends(get_db)) -> models.User:

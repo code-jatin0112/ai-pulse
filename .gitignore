@@ -1,6 +1,32 @@
+# Dependencies & Build
 node_modules/
 dist/
+
+# Python & Virtual Environments
 __pycache__/
 *.pyc
-*.db
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Testing & Coverage
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment & Secrets
+.env
+.env.*
+*.env
+!.env.example
+

@@ -3,6 +3,8 @@ import pytest
 
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["AI_MODE"] = "mock"
+os.environ.setdefault("SECRET_KEY", "test-signing-secret-key-at-least-32-chars-long")
+
 
 from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app  # noqa: E402

@@ -53,3 +53,19 @@ def submit(body: SubmitIn, m: models.Membership = Depends(current_membership), d
         db.add(resp)
     db.commit()
     return {"saved": len(body.answers)}
+
+
+@router.delete("/me")
+def delete_my_diagnostic(m: models.Membership = Depends(current_membership), db: Session = Depends(get_db)):
+    """Deletes all diagnostic responses, scores, reasons, and risks for the authenticated membership.
+
+    Scoped strictly to the authenticated organization membership. Idempotent and executed in a single transaction.
+    """
+    deleted_count = (
+        db.query(models.Response)
+        .filter_by(membership_id=m.id)
+        .delete(synchronize_session="fetch")
+    )
+    db.commit()
+    return {"status": "ok", "deleted": deleted_count}
+
