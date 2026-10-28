@@ -1,13 +1,50 @@
 import os
 
-# Load .env if present (very small loader, no extra dependency)
-_env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-if os.path.exists(_env_path):
-    for line in open(_env_path):
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip())
+
+def load_env() -> None:
+    """Loads configuration from local .env files if present.
+
+    Searches candidate paths in priority order:
+      1. backend/.env (canonical backend configuration)
+      2. .env in current working directory
+      3. .env in project repository root
+
+    Populates values into os.environ if unset or empty, ensuring that
+    empty environment variables do not block .env values. Quotes are cleanly stripped.
+    """
+    candidates = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env")),
+        os.path.abspath(os.path.join(os.getcwd(), ".env")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env")),
+    ]
+    seen_files = set()
+    for env_path in candidates:
+        if env_path in seen_files or not os.path.isfile(env_path):
+            continue
+        seen_files.add(env_path)
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip()
+                    # Strip matching outer quotes ("..." or '...')
+                    if len(v) >= 2 and (
+                        (v.startswith('"') and v.endswith('"'))
+                        or (v.startswith("'") and v.endswith("'"))
+                    ):
+                        v = v[1:-1].strip()
+                    # Only populate if not in os.environ or if the existing value is empty
+                    if not os.environ.get(k, "").strip():
+                        os.environ[k] = v
+        except OSError:
+            pass
+
+
+load_env()
 
 MIN_SECRET_LENGTH = 32
 DISALLOWED_SECRETS = {

@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 
+function isValidNumber(val) {
+  return typeof val === "number" && Number.isFinite(val) && !Number.isNaN(val);
+}
+
+function formatScore(score) {
+  if (isValidNumber(score)) {
+    return `${score.toFixed(1)} / 5.0`;
+  }
+  return "Not available";
+}
+
 export default function Report({ onRetake }) {
   const [report, setReport] = useState(null);
   const [error, setError] = useState("");
@@ -60,7 +71,7 @@ export default function Report({ onRetake }) {
   return (
     <div className="card">
       <h2>{report.name}: {report.level}</h2>
-      <p>Average score: {report.average_score}</p>
+      <p>Average score: {isValidNumber(report.average_score) ? report.average_score.toFixed(1) : (report.average_score || "Not available")}</p>
       <h3>Risks</h3>
       {report.risks.length === 0 ? (
         <p>No risks flagged.</p>
@@ -72,11 +83,15 @@ export default function Report({ onRetake }) {
         </ul>
       )}
       <h3>Next steps</h3>
-      <ul>
-        {report.next_steps.map((s) => (
-          <li key={s}>{s}</li>
-        ))}
-      </ul>
+      {!report.next_steps || report.next_steps.length === 0 ? (
+        <p>No next steps recorded.</p>
+      ) : (
+        <ul>
+          {report.next_steps.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      )}
 
       {report.growth_insights && (
         <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #e4e7ec" }}>
@@ -86,48 +101,52 @@ export default function Report({ onRetake }) {
           </p>
 
           <div style={{ display: "grid", gap: "12px", marginBottom: "20px" }}>
-            {report.growth_insights.breakdown.map((item) => (
-              <div
-                key={item.key}
-                style={{
-                  background: "#f8f9fc",
-                  border: "1px solid #eaecf0",
-                  padding: "12px 14px",
-                  borderRadius: "8px",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                  <span style={{ fontWeight: "600", fontSize: "14px" }}>{item.name}</span>
-                  <span style={{ fontWeight: "bold", fontSize: "14px", color: "#3f2a71" }}>
-                    {item.score.toFixed(1)} / 5.0
-                  </span>
-                </div>
+            {report.growth_insights.breakdown.map((item) => {
+              const valid = isValidNumber(item.score);
+              const percent = valid ? Math.max(0, Math.min(100, (item.score / 5) * 100)) : 0;
+              return (
                 <div
+                  key={item.key}
                   style={{
-                    background: "#eaecf0",
-                    borderRadius: "4px",
-                    height: "8px",
-                    overflow: "hidden",
-                    marginBottom: "6px",
+                    background: "#f8f9fc",
+                    border: "1px solid #eaecf0",
+                    padding: "12px 14px",
+                    borderRadius: "8px",
                   }}
-                  role="progressbar"
-                  aria-valuenow={item.score}
-                  aria-valuemin="1"
-                  aria-valuemax="5"
-                  aria-label={`${item.name} score`}
                 >
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <span style={{ fontWeight: "600", fontSize: "14px" }}>{item.name}</span>
+                    <span style={{ fontWeight: "bold", fontSize: "14px", color: valid ? "#3f2a71" : "#667085" }}>
+                      {formatScore(item.score)}
+                    </span>
+                  </div>
                   <div
                     style={{
-                      background: "#3f2a71",
-                      height: "100%",
-                      width: `${(item.score / 5) * 100}%`,
+                      background: "#eaecf0",
                       borderRadius: "4px",
+                      height: "8px",
+                      overflow: "hidden",
+                      marginBottom: "6px",
                     }}
-                  />
+                    role="progressbar"
+                    aria-valuenow={valid ? item.score : 0}
+                    aria-valuemin="1"
+                    aria-valuemax="5"
+                    aria-label={`${item.name} score`}
+                  >
+                    <div
+                      style={{
+                        background: "#3f2a71",
+                        height: "100%",
+                        width: `${percent}%`,
+                        borderRadius: "4px",
+                      }}
+                    />
+                  </div>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#475467" }}>{item.description}</p>
                 </div>
-                <p style={{ margin: 0, fontSize: "12px", color: "#475467" }}>{item.description}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {report.growth_insights.strongest_area && (
@@ -141,7 +160,7 @@ export default function Report({ onRetake }) {
               }}
             >
               <p style={{ margin: 0, color: "#027a48", fontWeight: "600", fontSize: "14px" }}>
-                Key Strength: {report.growth_insights.strongest_area.name} ({report.growth_insights.strongest_area.score.toFixed(1)} / 5.0)
+                Key Strength: {report.growth_insights.strongest_area.name} ({formatScore(report.growth_insights.strongest_area.score)})
               </p>
             </div>
           )}
@@ -156,7 +175,7 @@ export default function Report({ onRetake }) {
               }}
             >
               <p style={{ margin: "0 0 6px 0", color: "#b54708", fontWeight: "600", fontSize: "14px" }}>
-                Priority Improvement Area: {report.growth_insights.improvement_area.name} ({report.growth_insights.improvement_area.score.toFixed(1)} / 5.0)
+                Priority Improvement Area: {report.growth_insights.improvement_area.name} ({formatScore(report.growth_insights.improvement_area.score)})
               </p>
               <p style={{ margin: 0, fontSize: "13px", color: "#7a271a" }}>
                 <strong>Action Recommendation:</strong> {report.growth_insights.improvement_area.recommendation}

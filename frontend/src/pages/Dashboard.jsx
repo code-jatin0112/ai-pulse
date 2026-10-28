@@ -44,9 +44,9 @@ export default function Dashboard({ org }) {
         </div>
       )}
 
-      {data.top_risks && data.top_risks.length > 0 && (
-        <div>
-          <h3>Top Risks</h3>
+      <div>
+        <h3>Top Risks</h3>
+        {data.top_risks && data.top_risks.length > 0 ? (
           <ul>
             {data.top_risks.map(([risk, count]) => (
               <li key={risk}>
@@ -54,8 +54,10 @@ export default function Dashboard({ org }) {
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        ) : (
+          <p style={{ color: "#667085" }}>No aggregate risks flagged for qualified departments.</p>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -5,6 +6,8 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from .. import models
 from ..auth import verify_password, hash_password, is_legacy_hash, make_token, current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -33,7 +36,12 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
         {"org_id": m.org_id, "org_name": m.org.name, "role": m.role}
         for m in user.memberships
     ]
-    return {"token": make_token(user.id), "name": user.name, "organizations": orgs}
+    try:
+        token = make_token(user.id)
+    except Exception as exc:
+        logger.error("Token issuance failed due to %s", type(exc).__name__)
+        raise HTTPException(500, "Authentication service unavailable")
+    return {"token": token, "name": user.name, "organizations": orgs}
 
 
 @router.post("/select-org")
@@ -46,5 +54,10 @@ def select_org(body: SelectOrgIn, user: models.User = Depends(current_user), db:
     if not membership:
         raise HTTPException(403, "Not a member of this organization")
     # Issue a token scoped to the chosen organization
-    return {"token": make_token(user.id, body.org_id), "org_id": body.org_id}
+    try:
+        token = make_token(user.id, body.org_id)
+    except Exception as exc:
+        logger.error("Scoped token issuance failed due to %s", type(exc).__name__)
+        raise HTTPException(500, "Authentication service unavailable")
+    return {"token": token, "org_id": body.org_id}
 
