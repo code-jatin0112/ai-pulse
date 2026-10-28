@@ -5,6 +5,9 @@ from ..db import get_db
 from .. import models
 from ..auth import current_membership
 from ..utils import maturity_level
+from ..services.questions import questions_for
+from ..services.insights import calculate_growth_insights
+from .dashboard import get_completed_diagnostic
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -18,16 +21,33 @@ NEXT_STEPS = {
 
 @router.get("/me")
 def my_report(m: models.Membership = Depends(current_membership), db: Session = Depends(get_db)):
-    rows = db.query(models.Response).filter_by(membership_id=m.id).all()
-    scores = [r.score for r in rows if r.score is not None]
-    avg = sum(scores) / len(scores) if scores else None
-    flags = sorted({f for r in rows for f in (r.flags or [])})
+    expected_questions = questions_for(m.job_role, m.seniority)
+    completed = get_completed_diagnostic(db, m)
+    raw_answered_count = db.query(models.Response).filter_by(membership_id=m.id).count()
+
+    if completed is not None:
+        avg = completed["score"]
+        flags = completed["flags"]
+        completed_responses = completed["responses"]
+        insights = calculate_growth_insights(completed_responses, expected_questions)
+        return {
+            "name": m.user.name,
+            "organization": m.org.name,
+            "answered": raw_answered_count,
+            "average_score": round(avg, 2) if avg is not None else None,
+            "level": maturity_level(avg),
+            "risks": flags,
+            "next_steps": NEXT_STEPS.get(m.job_role, NEXT_STEPS["manager"]),
+            "growth_insights": insights,
+        }
+
     return {
         "name": m.user.name,
         "organization": m.org.name,
-        "answered": len(rows),
-        "average_score": round(avg, 2) if avg is not None else None,
-        "level": maturity_level(avg),
-        "risks": flags,
+        "answered": raw_answered_count,
+        "average_score": None,
+        "level": maturity_level(None),
+        "risks": [],
         "next_steps": NEXT_STEPS.get(m.job_role, NEXT_STEPS["manager"]),
+        "growth_insights": None,
     }

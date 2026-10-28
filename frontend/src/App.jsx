@@ -23,7 +23,7 @@ export default function App() {
         />
       )}
       {step === "diagnostic" && <Diagnostic onDone={() => setStep("report")} />}
-      {step === "report" && <Report />}
+      {step === "report" && <Report onRetake={() => setStep("diagnostic")} />}
       {step === "dashboard" && <Dashboard org={org} />}
     </div>
   );

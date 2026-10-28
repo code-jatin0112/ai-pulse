@@ -5,13 +5,25 @@ AI_MODE=live  -> calls an OpenAI-compatible chat completions endpoint
 """
 import hashlib
 import json
+import logging
 import os
+import time
 
 import httpx
 
 from ..config import AI_MODE, LLM_API_URL, LLM_API_KEY, LLM_MODEL
 
 _MOCK_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "mock_ai_responses.json")
+logger = logging.getLogger("ai_pulse.llm")
+
+DEFAULT_TIMEOUT_SECONDS = 15.0
+MAX_ATTEMPTS = 2
+
+
+class AIServiceError(Exception):
+    """Raised when external AI provider fails or times out."""
+    pass
+
 
 PROMPT = """You are scoring how well an employee uses AI at work.
 Rubric: 1 = no AI use, 2 = occasional basic use, 3 = regular use for simple tasks,
@@ -30,17 +42,50 @@ def _mock(answer: str) -> str:
 
 
 def score_answer(question: str, answer: str) -> str:
-    """Returns the raw text the model produced."""
+    """Returns the raw text the model produced, with bounded timeout and retry."""
     if AI_MODE == "mock":
         return _mock(answer)
-    r = httpx.post(
-        LLM_API_URL,
-        headers={"Authorization": f"Bearer {LLM_API_KEY}"},
-        json={
-            "model": LLM_MODEL,
-            "messages": [{"role": "user", "content": PROMPT.format(question=question, answer=answer)}],
-        },
-        timeout=60,
-    )
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+
+    if not LLM_API_URL or not LLM_API_KEY:
+        logger.error("Live AI mode configured but LLM_API_URL or LLM_API_KEY is missing")
+        raise AIServiceError("AI scoring provider is not properly configured")
+
+    payload = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": PROMPT.format(question=question, answer=answer)}],
+    }
+
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            with httpx.Client(timeout=DEFAULT_TIMEOUT_SECONDS) as client:
+                r = client.post(
+                    LLM_API_URL,
+                    headers={"Authorization": f"Bearer {LLM_API_KEY}"},
+                    json=payload,
+                )
+                r.raise_for_status()
+                data = r.json()
+                content = data["choices"][0]["message"]["content"]
+                if not content or not isinstance(content, str):
+                    raise AIServiceError("AI provider returned empty or non-string message content")
+                return content
+        except httpx.TimeoutException as exc:
+            logger.warning("AI provider timed out on attempt %d/%d", attempt, MAX_ATTEMPTS)
+            last_error = exc
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            logger.warning("AI provider HTTP status %d on attempt %d/%d", status_code, attempt, MAX_ATTEMPTS)
+            last_error = exc
+            if status_code not in (429, 503):
+                break
+        except (httpx.RequestError, KeyError, IndexError, json.JSONDecodeError) as exc:
+            logger.warning("AI provider request/format error on attempt %d/%d: %s", attempt, MAX_ATTEMPTS, type(exc).__name__)
+            last_error = exc
+            break
+
+        if attempt < MAX_ATTEMPTS:
+            time.sleep(0.5)
+
+    logger.error("AI scoring failed after %d attempt(s): %s", attempt, type(last_error).__name__)
+    raise AIServiceError("AI scoring provider error")
