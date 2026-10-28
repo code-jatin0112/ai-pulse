@@ -43,6 +43,15 @@ export default function Diagnostic({ onDone }) {
     );
   }
 
+  if (questions.length === 0 && !error) {
+    return (
+      <div className="card">
+        <h2>Your AI diagnostic</h2>
+        <p>No questions available for your role at this time.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <h2>Your AI diagnostic</h2>

@@ -1,3 +1,4 @@
+import os
 import jwt
 import pytest
 from fastapi import HTTPException
@@ -59,3 +60,54 @@ def test_tokens_signed_with_old_exposed_key_are_rejected():
         _decode(f"Bearer {old_token}")
     assert exc_info.value.status_code == 401
     assert "Invalid token" in exc_info.value.detail
+
+
+def test_startup_validation_halts_on_missing_or_invalid_secret(monkeypatch):
+    from app.main import validate_startup_configuration
+
+    monkeypatch.setenv("SECRET_KEY", "")
+    with pytest.raises(RuntimeError) as exc_info:
+        validate_startup_configuration()
+    assert "missing" in str(exc_info.value).lower()
+
+    monkeypatch.setenv("SECRET_KEY", "ai-pulse-dev-secret")
+    with pytest.raises(RuntimeError) as exc_info:
+        validate_startup_configuration()
+    assert "insecure or known compromised" in str(exc_info.value).lower()
+
+
+def test_load_env_populates_empty_and_strips_quotes(tmp_path, monkeypatch):
+    from app.config import load_env
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        'TEST_CUSTOM_LOAD_KEY="test_custom_value"\n'
+        'TEST_QUOTED_SINGLE=\'single_value\'\n'
+        '# This is a comment\n'
+        'TEST_UNQUOTED=unquoted_value\n'
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("TEST_CUSTOM_LOAD_KEY", raising=False)
+    monkeypatch.delenv("TEST_QUOTED_SINGLE", raising=False)
+    monkeypatch.delenv("TEST_UNQUOTED", raising=False)
+
+    load_env()
+
+    assert os.getenv("TEST_CUSTOM_LOAD_KEY") == "test_custom_value"
+    assert os.getenv("TEST_QUOTED_SINGLE") == "single_value"
+    assert os.getenv("TEST_UNQUOTED") == "unquoted_value"
+
+
+def test_login_returns_sanitized_500_on_runtime_config_error(client, monkeypatch):
+    # Verify internal exception details and secret information are NEVER leaked in HTTP 500 responses
+    internal_error_msg = "SENSITIVE_INTERNAL_SECRET_OR_KEY_DETAIL_MISSING"
+    monkeypatch.setattr(
+        "app.routes.auth_routes.make_token",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError(internal_error_msg)),
+    )
+    res = client.post("/auth/login", json={"email": "asha@northwind.test", "password": "pulse123"})
+    assert res.status_code == 500
+    assert res.json()["detail"] == "Authentication service unavailable"
+    # Proves internal details and secret traces are never leaked in response body
+    assert internal_error_msg not in res.text
