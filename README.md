@@ -27,7 +27,7 @@ AI Pulse provides two tailored experiences:
 ## 3. Local Setup & Reproducible Execution
 
 ### Prerequisites
-- Python 3.12 (`python3 --version`)
+- Python 3.12 (Verify with `python3.12 --version` or `python3 --version`. Note: on macOS, the default system `/usr/bin/python3` is Python 3.9.6. Ensure Python 3.12 is installed, e.g. via Homebrew: `brew install python@3.12`).
 - Node.js 18+ and npm (`node -v`, `npm -v`)
 
 ### Step 1: Backend Setup
@@ -35,20 +35,24 @@ AI Pulse provides two tailored experiences:
 ```bash
 cd backend
 
-# 1. Create and activate a Python 3.12 virtual environment
-python3 -m venv .venv
+# 1. Verify Python 3.12 and create a virtual environment
+python3.12 --version  # Must output Python 3.12.x
+python3.12 -m venv .venv || python3 -m venv .venv
 source .venv/bin/activate
 
-# 2. Install backend dependencies
+# Confirm active interpreter is Python 3.12:
+python --version
+
+# 2. Install backend dependencies (including bcrypt)
 pip install -r requirements.txt
 
 # 3. Create .env from template and configure a cryptographically secure JWT secret
 cp .env.example .env
 
 # Generate a strong 64-character hex secret and insert it directly into .env (without printing):
-python3 -c "import secrets; key = secrets.token_hex(32); content = open('.env').read().replace('replace-with-a-secure-random-secret-key-at-least-32-chars', key); open('.env', 'w').write(content)"
+python -c "import secrets; key = secrets.token_hex(32); content = open('.env').read().replace('replace-with-a-secure-random-secret-key-at-least-32-chars', key); open('.env', 'w').write(content)"
 
-# 4. Seed initial demonstration data (all user passwords: pulse123)
+# 4. Seed initial demonstration data with secure bcrypt hashes (all user passwords: pulse123)
 python -m app.seed
 
 # 5. Start the FastAPI backend server
@@ -131,6 +135,9 @@ During the technical review and security audit of the initial codebase, several 
 9. **Personal Report Completion Inconsistency**:
    - *Problem*: `GET /reports/me` previously calculated averages and risk tags over incomplete responses, showing a maturity score even when `growth_insights` returned `null` and the dashboard considered the diagnostic incomplete.
    - *Fix*: Standardized personal report calculations on the canonical completion validator (`get_completed_diagnostic`). Incomplete profiles consistently report `average_score: null`, `level: "Not assessed"`, and `risks: []`.
+10. **Insecure Password Storage & Missing Salt**:
+   - *Problem*: Passwords were stored using unsalted single-pass SHA-256 (`hashlib.sha256`), vulnerable to dictionary and rainbow table attacks.
+   - *Fix*: Upgraded password hashing to `bcrypt` with cryptographically secure random salts (work factor 12 in production, 4 in test environments). Implemented backwards-compatible constant-time verification for legacy SHA-256 hashes with automatic on-login rehashing to bcrypt. Added automated tests confirming demo users authenticate and legacy hashes migrate seamlessly.
 
 ---
 
@@ -177,7 +184,7 @@ Prior to this feature, employees only received a single overall score (e.g. `3.2
 ## 7. Testing & Evidence
 
 ### Test Execution Summary
-- **Backend Tests**: **90 passed** across 8 test suites in `backend/tests/` (100% pass rate).
+- **Backend Tests**: **95 passed** across 9 test suites in `backend/tests/` (100% pass rate).
 - **Frontend Production Build**: **Passed** in 439ms via `vite build` with zero compiler warnings or errors.
 - **API Integration Smoke Test**: Verified complete 12-step employee workflow and 8-step administrator workflow against running FastAPI application.
 
@@ -220,15 +227,12 @@ cd backend
 
 ## 9. Known Limitations and Deliberately Deferred Work
 
-1. **Password Hashing (Legacy SHA-256)**:
-   - *Limitation*: The starter codebase uses unsalted `hashlib.sha256(password.encode()).hexdigest()`. While functional for local testing and preserving seeded passwords (`pulse123`), it lacks salting and adaptive work factor.
-   - *Deferred*: Upgrading to `argon2id` or `bcrypt` was deferred to preserve compatibility with seeded data and focus on assessment priorities. In enterprise production, an adaptive key-derivation function is required.
-2. **Token Storage in LocalStorage**:
+1. **Token Storage in LocalStorage**:
    - *Limitation*: JWT tokens are stored in browser `localStorage`.
    - *Deferred*: Moving to `HttpOnly`, `SameSite=Strict` secure cookies was deferred to avoid requiring HTTPS termination and domain configuration in local development.
-3. **Live LLM Testing**:
+2. **Live LLM Testing**:
    - *Limitation*: Live AI mode was designed and tested against mock endpoints and unit mocks, but was not tested against a live paid OpenAI/Claude endpoint in this offline environment.
-4. **Active Database Scope of Deletion**:
+3. **Active Database Scope of Deletion**:
    - *Limitation*: Self-service deletion removes records from the active SQLite/PostgreSQL database. It cannot scrub external LLM provider API logs or offsite system backups.
 
 ---
