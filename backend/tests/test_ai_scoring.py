@@ -1,4 +1,5 @@
 import json
+import os
 import pytest
 import httpx
 from unittest.mock import MagicMock, patch
@@ -247,7 +248,8 @@ def test_no_invalid_score_or_risk_flag_persisted(client, monkeypatch):
 
 def test_mock_ai_responses_json_regression_fixtures():
     """Validates each of the 10 canned items in mock_ai_responses.json against expected pass/fail."""
-    with open("data/mock_ai_responses.json") as f:
+    fixture_path = os.path.join(os.path.dirname(__file__), "..", "data", "mock_ai_responses.json")
+    with open(fixture_path) as f:
         canned = json.load(f)
 
     # Indices 0 to 4 are valid

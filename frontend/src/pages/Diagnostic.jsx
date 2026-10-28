@@ -6,11 +6,18 @@ export default function Diagnostic({ onDone }) {
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api("/diagnostic/questions")
-      .then(setQuestions)
-      .catch((err) => setError(err.message));
+      .then((qs) => {
+        setQuestions(qs);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
   }, []);
 
   async function submit() {
@@ -25,6 +32,15 @@ export default function Diagnostic({ onDone }) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="card">
+        <h2>Your AI diagnostic</h2>
+        <p>Loading questions…</p>
+      </div>
+    );
   }
 
   return (

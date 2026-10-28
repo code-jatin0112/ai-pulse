@@ -51,6 +51,9 @@ def get_completed_diagnostic(db: Session, membership: models.Membership) -> dict
         for qid in expected_qids
         if latest_by_qid[qid].score is not None
     ]
+    if len(scores) < len(expected_qids):
+        return None
+
     avg_score = sum(scores) / len(scores) if scores else None
 
     flags = sorted({
@@ -59,11 +62,11 @@ def get_completed_diagnostic(db: Session, membership: models.Membership) -> dict
         for f in (latest_by_qid[qid].flags or [])
     })
 
-
     return {
         "membership_id": membership.id,
         "score": avg_score,
         "flags": flags,
+        "responses": [latest_by_qid[qid] for qid in expected_qids],
     }
 
 
