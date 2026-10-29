@@ -21,6 +21,9 @@ export default function App() {
   }
 
   function handleSelectOrg(o) {
+    if (!org || org.org_id !== o.org_id) {
+      setDraftAnswers({});
+    }
     setOrg(o);
     setHistory(["org"]);
     setStep(o.role === "admin" ? "dashboard" : "diagnostic");
@@ -28,6 +31,8 @@ export default function App() {
 
   function handleChangeOrg() {
     setOrg(null);
+    // Explicitly clear draft answers so Organization A's drafts never populate Organization B
+    setDraftAnswers({});
     // Restore base user-level token so selecting another org requires obtaining a fresh org-scoped JWT
     if (session?.token) {
       setToken(session.token);
@@ -40,8 +45,15 @@ export default function App() {
     if (history.length > 0) {
       const prevStep = history[history.length - 1];
       setHistory((h) => h.slice(0, -1));
+      // Guard: Back navigation must never bypass authentication into unauthenticated state
+      if (prevStep === "login") {
+        handleLogout();
+        return;
+      }
       if (prevStep === "org") {
         setOrg(null);
+        // Leaving an organization back to the picker clears draft answers
+        setDraftAnswers({});
         if (session?.token) {
           setToken(session.token);
         }
@@ -50,6 +62,7 @@ export default function App() {
     } else {
       // Fallback to org selection
       setOrg(null);
+      setDraftAnswers({});
       if (session?.token) {
         setToken(session.token);
       }
