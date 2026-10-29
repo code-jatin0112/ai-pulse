@@ -12,7 +12,7 @@ function formatScore(score) {
   return "Not available";
 }
 
-export default function Report({ onRetake }) {
+export default function Report({ onRetake, onDelete }) {
   const [report, setReport] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -32,6 +32,9 @@ export default function Report({ onRetake }) {
       await api("/diagnostic/me", { method: "DELETE" });
       setSuccess("Your diagnostic answers and report have been deleted from the active AI Pulse database.");
       setConfirming(false);
+      if (onDelete) {
+        onDelete();
+      }
       setReport({
         name: report?.name || "Employee",
         organization: report?.organization || "",

@@ -4,3 +4,11 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7fb; color
 button { background: #3f2a71; color: #fff; border: 0; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
 input, textarea, select { width: 100%; padding: 8px; margin: 6px 0 14px; box-sizing: border-box; }
 .error { color: #b42318; }
+.nav-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #eaecf0; }
+.nav-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn-secondary { background: #fff; color: #344054; border: 1px solid #d0d5dd; font-size: 13px; font-weight: 500; }
+.btn-secondary:hover { background: #f8f9fa; }
+.btn-outline-primary { background: #fff; color: #3f2a71; border: 1px solid #3f2a71; font-size: 13px; font-weight: 500; }
+.btn-outline-primary:hover { background: #f5f3ff; }
+.btn-danger-subtle { background: #fef3f2; color: #b42318; border: 1px solid #fee4e2; font-size: 13px; font-weight: 500; }
+.btn-danger-subtle:hover { background: #fee4e2; }
