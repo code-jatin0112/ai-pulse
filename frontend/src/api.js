@@ -8,6 +8,10 @@ export function setToken(t) {
   localStorage.setItem("token", t);
 }
 
+export function clearToken() {
+  localStorage.removeItem("token");
+}
+
 export async function api(path, options = {}) {
   let res;
   try {
